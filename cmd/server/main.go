@@ -7,6 +7,8 @@ import (
 	"os/signal"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	routing "github.com/genus555/learn-pub-sub-starter/internal/routing"
+	pubsub "github.com/genus555/learn-pub-sub-starter/internal/pubsub"
 )
 
 func main() {
@@ -20,6 +22,15 @@ func main() {
 	defer connection.Close()
 
 	fmt.Println("Starting Peril server...")
+
+	ch, err := connection.Channel()
+	if err != nil { log.Fatalf("Something went wrong with channel: %v", err) }
+
+	state := routing.PlayingState{
+		IsPaused:	true,
+	}
+	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
+	if err != nil { log.Fatalf("Something went wrong with publishing JSON: %v", err) }
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
