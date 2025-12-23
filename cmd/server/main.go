@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	routing "github.com/genus555/learn-pub-sub-starter/internal/routing"
+	gamelogic "github.com/genus555/learn-pub-sub-starter/internal/gamelogic"
 	pubsub "github.com/genus555/learn-pub-sub-starter/internal/pubsub"
+	routing "github.com/genus555/learn-pub-sub-starter/internal/routing"
 )
 
 func main() {
@@ -21,19 +19,31 @@ func main() {
 	}
 	defer connection.Close()
 
-	fmt.Println("Starting Peril server...")
+	publishCh, err := connection.Channel()
+	if err != nil {log.Fatalf("Something went wrong with channel: %v", err)}
 
-	ch, err := connection.Channel()
-	if err != nil { log.Fatalf("Something went wrong with channel: %v", err) }
-
-	state := routing.PlayingState{
-		IsPaused:	true,
+	gamelogic.PrintServerHelp()
+	for {
+		inputs := gamelogic.GetInput()
+		if len(inputs) == 0 {
+			continue
+		}
+		state := routing.PlayingState{}
+		switch inputs[0] {
+		case "pause":
+			log.Println("Game state paused")
+			state.IsPaused = true
+		case "resume":
+			log.Println("Game state resumed")
+			state.IsPaused = false
+		case "quit":
+			log.Println("Closing Connection")
+			return
+		default:
+			log.Printf("\"%s\" is not a valid command", inputs[0])
+			continue
+		}
+		err = pubsub.PublishJSON(publishCh, routing.ExchangePerilDirect, routing.PauseKey, state)
+		if err != nil {log.Fatalf("Something went wrong with publishing JSON: %v", err)}
 	}
-	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
-	if err != nil { log.Fatalf("Something went wrong with publishing JSON: %v", err) }
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("Connection is closed")
 }
