@@ -19,6 +19,10 @@ func main() {
 	}
 	defer connection.Close()
 
+	_, q, err := pubsub.DeclareAndBind(connection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", "durable")
+	if err != nil {log.Fatalf("Something went wrong with creating queue: %v", err)}
+	log.Println("Queue ", q.Name, " was declared and bound")
+
 	publishCh, err := connection.Channel()
 	if err != nil {log.Fatalf("Something went wrong with channel: %v", err)}
 

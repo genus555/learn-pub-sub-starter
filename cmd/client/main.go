@@ -38,6 +38,38 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("Connection is closed")
+
+	//Client REPL
+	gameState := gamelogic.NewGameState(username)
+
+	for {
+		inputs := gamelogic.GetInput()
+		if len(inputs) == 0 {
+			continue
+		}
+		switch inputs[0] {
+		case "spawn":
+			err := gameState.CommandSpawn(inputs)
+			if err != nil {log.Println(err)}
+		case "move":
+			_, err := gameState.CommandMove(inputs)
+			if err != nil {
+				log.Println(err)
+			} else {
+				fmt.Println("Unit has successfully moved")
+			}
+		case "status":
+			gameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			log.Println("Spamming is not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			log.Printf("\"%s\" is not a valid command", inputs[0])
+			continue
+		}
+	}
 }
