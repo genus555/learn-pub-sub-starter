@@ -12,6 +12,13 @@ import (
 	routing "github.com/genus555/learn-pub-sub-starter/internal/routing"
 )
 
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(ps)
+	}
+}
+
 func main() {
 	connection_string := "amqp://guest:guest@localhost:5672/"
 	connection, err := amqp.Dial(connection_string)
@@ -26,21 +33,15 @@ func main() {
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {log.Fatalf("Welcome went wrong: %v", err)}
 
-	queueName := fmt.Sprintf("%v.%v", routing.PauseKey, username)
-	ch, _, err := pubsub.DeclareAndBind(connection, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient")
-	if err != nil {log.Fatalf("DeclareAndBind went wrong: %v", err)}
-
-	state := routing.PlayingState{
-		IsPaused:	true,
-	}
-	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
-	if err != nil { log.Fatalf("Something went wrong with publishing JSON: %v", err) }
+	queueName := fmt.Sprintf("pause.%v", username)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
 	//Client REPL
 	gameState := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient", handlerPause(gameState))
 
 	for {
 		inputs := gamelogic.GetInput()
