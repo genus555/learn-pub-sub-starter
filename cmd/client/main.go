@@ -12,13 +12,6 @@ import (
 	routing "github.com/genus555/learn-pub-sub-starter/internal/routing"
 )
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(ps routing.PlayingState) {
-		defer fmt.Print("> ")
-		gs.HandlePause(ps)
-	}
-}
-
 func main() {
 	connection_string := "amqp://guest:guest@localhost:5672/"
 	connection, err := amqp.Dial(connection_string)
@@ -29,6 +22,8 @@ func main() {
 	}
 	defer connection.Close()
 	fmt.Println("Starting Peril client...")
+
+	publishCh, err := connection.Channel()
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {log.Fatalf("Welcome went wrong: %v", err)}
@@ -41,7 +36,10 @@ func main() {
 	//Client REPL
 	gameState := gamelogic.NewGameState(username)
 
+	move_key := routing.ArmyMovesPrefix + "." + username
+
 	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient", handlerPause(gameState))
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, move_key, routing.ArmyMovesPrefix+".*", "transient", handlerMove(gameState))
 
 	for {
 		inputs := gamelogic.GetInput()
@@ -53,11 +51,12 @@ func main() {
 			err := gameState.CommandSpawn(inputs)
 			if err != nil {log.Println(err)}
 		case "move":
-			_, err := gameState.CommandMove(inputs)
+			move, err := gameState.CommandMove(inputs)
 			if err != nil {
 				log.Println(err)
 			} else {
-				fmt.Println("Unit has successfully moved")
+				err = pubsub.PublishJSON(publishCh, routing.ExchangePerilTopic, move_key, move)
+				log.Printf("%s moved successfully", username)
 			}
 		case "status":
 			gameState.CommandStatus()
