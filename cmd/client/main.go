@@ -37,9 +37,11 @@ func main() {
 	gameState := gamelogic.NewGameState(username)
 
 	move_key := routing.ArmyMovesPrefix + "." + username
+	war_key := routing.WarRecognitionsPrefix + ".*"
 
 	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient", handlerPause(gameState))
-	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, move_key, routing.ArmyMovesPrefix+".*", "transient", handlerMove(gameState))
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, move_key, routing.ArmyMovesPrefix+".*", "transient", handlerMove(gameState, publishCh))
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix, war_key, "durable", handlerWar(gameState))
 
 	for {
 		inputs := gamelogic.GetInput()
