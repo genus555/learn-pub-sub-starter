@@ -23,6 +23,8 @@ func main() {
 	if err != nil {log.Fatalf("Something went wrong with creating queue: %v", err)}
 	log.Println("Queue ", q.Name, " was declared and bound")
 
+	err = pubsub.SubscribeGob(connection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", "durable", handleLog())
+
 	publishCh, err := connection.Channel()
 	if err != nil {log.Fatalf("Something went wrong with channel: %v", err)}
 
